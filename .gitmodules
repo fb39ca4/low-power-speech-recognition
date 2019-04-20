@@ -1,0 +1,3 @@
+[submodule "modm-repo"]
+	path = modm-repo
+	url = git@github.com:fb39ca4/modm.git
