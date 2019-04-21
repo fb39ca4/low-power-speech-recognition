@@ -1,0 +1,27 @@
+<library>
+	<repositories>
+		<repository><path>./modm-repo/repo.lb</path></repository>
+	</repositories>
+	<options>
+		<option name=":target">stm32f401ret</option>
+		<option name=":build:build.path">./build</option>
+		<option name=":build:project.name">speech_100</option>
+		<option name=":build:openocd.cfg">./scripts/openocd_board.cfg</option>
+		<option name=":build:cmake:include_makefile">False</option>
+		<option name=":docs:generate_module_docs">True</option>
+	</options>
+	<modules>
+		<module>:cmsis:dsp</module>
+		<module>:debug</module>
+		<module>:driver:adc_sampler</module>
+		<module>:math:filter</module>
+		<module>:platform:adc:1</module>
+		<module>:platform:core</module>
+		<module>:platform:clock</module>
+		<module>:platform:gpio</module>
+		<module>:platform:adc</module>
+		<module>:platform:uart:2</module>
+		<module>:processing:protothread</module>
+		<module>:processing:resumable</module>
+	</modules>
+</library>
