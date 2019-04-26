@@ -17,7 +17,6 @@ MEMORY
 	FLASH (rx) : ORIGIN = 0x8000000, LENGTH = 524288
 	SRAM1 (rwx) : ORIGIN = 0x20000000, LENGTH = 131072
 	RAM (rwx) : ORIGIN = 0x20000000, LENGTH = 131072
-
 }
 
 OUTPUT_FORMAT("elf32-littlearm")
@@ -156,7 +155,7 @@ SECTIONS
 	{
 		__heap1_start = .;
 
-		. = ORIGIN(SRAM1) + LENGTH(SRAM1);
+		//. = ORIGIN(SRAM1) + LENGTH(SRAM1);
 		__heap1_end = .;
 	} >RAM
 

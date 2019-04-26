@@ -21,6 +21,7 @@
 		<module>:platform:gpio</module>
 		<module>:platform:adc</module>
 		<module>:platform:uart:2</module>
+		<module>:platform:timer:5</module>
 		<module>:processing:protothread</module>
 		<module>:processing:resumable</module>
 	</modules>

@@ -4,3 +4,6 @@
 [submodule "static_math"]
 	path = static_math
 	url = git@github.com:Morwenn/static_math.git
+[submodule "gcem"]
+	path = gcem
+	url = git@github.com:kthohr/gcem.git

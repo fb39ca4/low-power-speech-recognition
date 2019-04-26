@@ -12,6 +12,10 @@
 // ----------------------------------------------------------------------------
 #include <type_traits>
 #include <array>
+#include <cassert>
+#include <atomic>
+#include <algorithm>
+#include <numeric>
 
 #include "arm_math.h"
 
@@ -21,9 +25,9 @@
 #include <modm/processing/timer.hpp>
 
 #include <common/board.hpp>
-#include <common/blink_thread.hpp>
+#include <common/timekeeping.hpp>
 
-#include "hanning_window.hpp"
+#include "mfcc.hpp"
 
 // Set the log level
 #undef	MODM_LOG_LEVEL
@@ -33,11 +37,25 @@ using MicrophoneInput = modm::platform::GpioInputA0;
 using Adc = modm::platform::Adc1;
 using AdcInterrupt = modm::platform::AdcInterrupt1;
 
-volatile int conversionsComplete = 0;
+constexpr int adcSampleRate = ((ClockConfiguration::Adc / 8.0) / (56 + 12)) / 16;
+constexpr int windowStride = 256;
+constexpr int windowSize = windowStride * 2;
 
-constexpr int sampleBufferSize = 512;
-constexpr int frameSize = sampleBufferSize * 2;
-constexpr int windowSize = frameSize / 2;
+HannWindow<windowSize> fftWindowingLut;
+
+constexpr int numMelCoefficients = 16;
+
+constexpr mfcc::MelFilterLut<numMelCoefficients, 0, 1500, windowSize, adcSampleRate> melFilterLut;
+constexpr DiscreteCosineTransformTable<16> dctTable;
+
+std::array<uint16_t, windowSize> rawSamples;
+std::array<float, windowSize> normalizedSamples;
+std::array<float, windowSize> fftSamples;
+std::array<float, windowSize / 2> spectrumPowerSquared;
+float melPower[numMelCoefficients];
+float melCepstrum[numMelCoefficients];
+arm_rfft_fast_instance_f32 fftInstance;
+
 
 
 namespace AdcInterruptHandler {
@@ -46,13 +64,15 @@ namespace AdcInterruptHandler {
 
 	namespace {
 		constexpr int numBuffers = 3;
-		volatile uint16_t buffer[numBuffers][sampleBufferSize];
+		volatile uint16_t buffer[numBuffers][windowStride];
 		int bufferIdx;
-		volatile uint16_t* volatile availableBuffer;
+		std::atomic<volatile uint16_t*> availableBuffer = nullptr;
 		size_t bufferPos;
 		uint32_t oversampleAccumulator;
 		uint32_t oversampleRemaining;
 	}
+
+	std::atomic<int> samplesComplete = 0;
 
 	void handler() {
 		if (Adc::getInterruptFlags() &  Adc::InterruptFlag::EndOfRegularConversion) {
@@ -64,13 +84,13 @@ namespace AdcInterruptHandler {
 				oversampleRemaining = oversampleRatio;
 				buffer[bufferIdx][bufferPos++] = (oversampleAccumulator / oversampleRatio);
 				oversampleAccumulator = 0;
-				if (bufferPos == sampleBufferSize) {
+				if (bufferPos == windowStride) {
 					bufferPos = 0;
 					availableBuffer = buffer[bufferIdx++];
 					bufferIdx = (bufferIdx < numBuffers) ? bufferIdx : 0;
 				}
+				samplesComplete += 1;
 			}
-			conversionsComplete += 1;
 		}
 		//Adc::acknowledgeInterruptFlags(Adc::InterruptFlag::All);
 	}
@@ -86,31 +106,16 @@ namespace AdcInterruptHandler {
 		bufferIdx = 0;
 	}
 
-	const volatile uint16_t* getData() {
-		decltype(availableBuffer) retval;
-		if (availableBuffer != nullptr) {
-			retval = availableBuffer;
-			availableBuffer = nullptr;
-		}
-		else {
-			retval = nullptr;
-		}
-		return const_cast<const volatile uint16_t*>(retval);
+	const uint16_t* getData() {
+		return const_cast<const uint16_t*>(availableBuffer.exchange(nullptr));
 	}
 
-	const volatile uint16_t* getDataBlocking() {
-		while (availableBuffer == nullptr);
-		decltype(availableBuffer) retval = availableBuffer;
-		availableBuffer = nullptr;
-		return const_cast<const volatile uint16_t*>(retval);
+	const uint16_t* getDataBlocking() {
+		const uint16_t* retval;
+		while ((retval = getData()) == nullptr);
+		return const_cast<const uint16_t*>(retval);
 	}
 };
-
-
-float sampleFrame[frameSize];
-float fftFrame[frameSize];
-float spectrumPowerSquared[frameSize / 2];
-arm_rfft_fast_instance_f32 fftInstance;
 
 int main(void) {
 	initCommon();
@@ -131,76 +136,130 @@ int main(void) {
 	MicrophoneInput::setInput(modm::platform::Gpio::InputType::PullUp);
 	Adc::connect<MicrophoneInput::In0>();
 	Adc::initialize<ClockConfiguration, ClockConfiguration::Adc / 8>();
-	Adc::setPinChannel<MicrophoneInput>(Adc::SampleTime::Cycles15);
+	Adc::setPinChannel<MicrophoneInput>(Adc::SampleTime::Cycles56);
 
 	AdcInterruptHandler::initialize();
 
 	Adc::enableFreeRunningMode();
 	Adc::startConversion();
 
-	// while (1)
-	// {
-	// 	uint32_t total = 0;
-	// 	int i = 0;
-	// 	modm::ShortTimeout timeout;
-	// 	for (timeout.restart(1000); !timeout.isExpired(); i++) {
-	// 		// wait for conversion to finish
-	// 		while (!Adc::isConversionFinished());
-	// 		// print result
-	// 		total += Adc::getValue();
-	// 	}
-	// 	MODM_LOG_INFO << total << " " << i << modm::endl;
-	// }
-
-	// while (true) {
-	// 	while (!Adc::isConversionFinished());
-	// 	MODM_LOG_INFO << Adc::getValue() << " 0 4096" << modm::endl;
-	// }
-
+	timekeeping::initTimer();
 
 	const uint16_t* prevSamples;
 	const uint16_t* currentSamples = const_cast<const uint16_t*>(AdcInterruptHandler::getDataBlocking());
-	modm::ShortPeriodicTimer powerSpectrumTimer(50);
+	modm::ShortPeriodicTimer powerSpectrumTimer(100);
+	modm::ShortPeriodicTimer framesPerSecondTimer(1000);
 	int frames = 0;
+	arm_rfft_fast_init_f32(&fftInstance, windowSize);
+
+	int wordLengthCounter = 0;
+	int maxQuietGap = 5;
+	int quietGapCounter = 0;
+	float amplitudeThreshold = 0.01;
 
 	while (1) {
-		prevSamples = currentSamples;
-		currentSamples = const_cast<const uint16_t*>(AdcInterruptHandler::getDataBlocking());
+		const uint16_t* newSamples = AdcInterruptHandler::getDataBlocking();
 
-		int32_t sampleSum = 0;
-		for (int i = 0; i < sampleBufferSize; i++) {
-			sampleSum += prevSamples[i];
+		uint32_t startTime = timekeeping::now();
+
+		// Shift old samples and copy new samples to buffer
+		std::copy(rawSamples.begin() + windowStride, rawSamples.end(), rawSamples.begin());
+		std::copy(currentSamples, currentSamples + windowStride, rawSamples.end() - windowStride);
+
+		uint32_t copyTime = timekeeping::now();
+
+		auto sampleSum = std::accumulate(rawSamples.begin(), rawSamples.end(), uint32_t(0));
+		// Make sure the sum was to a uint32_t to prevent overflow
+		static_assert(std::is_same<decltype(sampleSum), uint32_t>::value);
+		float dcOffset = static_cast<float>(sampleSum) / windowSize;
+
+		uint32_t averagingTime = timekeeping::now();
+
+		float power = 0;
+		for (int i = 0; i < windowSize; i++) {
+			float normalizedSample = fftWindowingLut[i] * (currentSamples[i] - dcOffset) / 512.0;
+			//maxAmplitude = std::max(std::abs(normalizedSample), maxAmplitude);
+			power += normalizedSample * normalizedSample;
+			normalizedSamples[i] = normalizedSample;
+		}
+		float rmsAmplitude = std::sqrt(power / windowSize);
+
+		uint32_t normalizationTime = timekeeping::now();
+
+		if (rmsAmplitude > amplitudeThreshold) {
+			Led::set();
+			wordLengthCounter += 1;
+			quietGapCounter = maxQuietGap;
+		}
+		else {
+			Led::reset();
+			if (wordLengthCounter > 0) {
+				quietGapCounter -= 1;
+				wordLengthCounter += 1;
+				if (quietGapCounter == 0) {
+					MODM_LOG_INFO << "msg:word length: " << wordLengthCounter - maxQuietGap << modm::endl;
+					wordLengthCounter = 0;
+				}
+			}
 		}
 
-		for (int i = 0; i < sampleBufferSize; i++) {
-			sampleSum += currentSamples[i];
+		uint32_t fftTime, magTime, melFilterTime, dctTime;
+
+		arm_rfft_fast_f32(&fftInstance, normalizedSamples.data(), fftSamples.data(), 0);
+		fftTime = timekeeping::now();
+		arm_cmplx_mag_squared_f32(fftSamples.data(), spectrumPowerSquared.data(), windowSize / 2);
+		magTime = timekeeping::now();
+
+		float totalPower = 0.0f;
+		for (int i = 1; i <= numMelCoefficients; i++) {
+			float melFilterPower = melFilterLut.evaluate(spectrumPowerSquared, i);
+			totalPower += melFilterPower;
+			melPower[i - 1] = std::log2f(melFilterPower);
 		}
-
-		int16_t dcOffset = sampleSum / frameSize;
-
-		for (int i = 0; i < sampleBufferSize; i++) {
-			sampleFrame[i] = hanningWindow[i] * (prevSamples[i] - dcOffset) / 512.0;
+		melFilterTime = timekeeping::now();
+		for (int i = 0; i < numMelCoefficients; i++) {
+			melCepstrum[i] = dctTable.evaluate(melPower, i);
 		}
-
-		for (int i = 0; i < sampleBufferSize; i++) {
-			sampleFrame[i + sampleBufferSize] = hanningWindow[sampleBufferSize - i - 1] * (currentSamples[i] - dcOffset) / 512.0;
-		}
-
-		arm_rfft_fast_init_f32(&fftInstance, frameSize);
-		arm_rfft_fast_f32(&fftInstance, sampleFrame, fftFrame, 0);
-		arm_cmplx_mag_squared_f32(fftFrame, spectrumPowerSquared, frameSize / 2);
-
-
+		dctTime = timekeeping::now();
 		frames += 1;
-		if (timer.execute()) {
-			MODM_LOG_INFO << "spec_pwr:";
-			for (int i = 0; i < frameSize / 2; i++) {
+
+		if (framesPerSecondTimer.execute()) {
+
+			MODM_LOG_INFO << "stat:fps:" << frames << " samplerate:" << AdcInterruptHandler::samplesComplete.exchange(0);
+			MODM_LOG_INFO << " copy:" << copyTime - startTime;
+			MODM_LOG_INFO << " avging:" << averagingTime - copyTime;
+			MODM_LOG_INFO << " normal:" << normalizationTime - averagingTime;
+			MODM_LOG_INFO << " fft:" << fftTime - normalizationTime;
+			MODM_LOG_INFO << " mag:" << magTime - fftTime;
+			MODM_LOG_INFO << " mel:" << melFilterTime - magTime;
+			MODM_LOG_INFO << " dct:" << dctTime - melFilterTime;
+			MODM_LOG_INFO << " at:" << rmsAmplitude;
+			MODM_LOG_INFO << "         \r";
+			frames = 0;
+		}
+
+		if (powerSpectrumTimer.execute()) {
+			/*MODM_LOG_INFO << "raw:";
+			for (int i = 0; i < windowSize; i++) {
+				MODM_LOG_INFO << rawSamples[i] << " ";
+			}
+			MODM_LOG_INFO << modm::endl;*/
+
+			/*MODM_LOG_INFO << "spec:";
+			for (int i = 0; i < windowSize / 2; i++) {
 				MODM_LOG_INFO << static_cast<int>(spectrumPowerSquared[i]) << " ";
 			}
-			MODM_LOG_INFO << modm::endl;
-			//MODM_LOG_INFO << frames << modm::endl;
-			frames = 0;
+			MODM_LOG_INFO << modm::endl;*/
 
+		}
+
+		if (true) {
+			MODM_LOG_INFO << "mfcc:";
+			MODM_LOG_INFO << rmsAmplitude << " ";
+			for (int i = 1; i < numMelCoefficients; i++) {
+				MODM_LOG_INFO << melCepstrum[i] << " ";
+			}
+			MODM_LOG_INFO << modm::endl;
 		}
 
 	}

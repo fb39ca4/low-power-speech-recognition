@@ -1,3 +1,5 @@
+#! /usr/bin/env python3
+
 # Import libraries
 from numpy import *
 import numpy as np
@@ -16,10 +18,12 @@ app = QtGui.QApplication([])            # you MUST do this once (initialize thin
 
 win = pg.GraphicsWindow(title="Speech Recognition") # creates a window
 p = win.addPlot(title="Signal")  # creates empty space for the plot in the window
-p.setXRange(0,512)
-p.setYRange(0,1)
+p.setXRange(0,16)
+p.setYRange(-20,20)
 curve = p.plot()                        # create an empty "plot" (a curve to plot)
 curve.setPos(0,0)                   # set x position in the graph to 0
+
+frequencyScale = np.linspace(0, 13000 / 2, num=256)
 
 def get_data():
 	# line = ""
@@ -37,12 +41,29 @@ def get_data():
 def update():
 	try:
 		line = ser.readline()
-		if line.startswith(b"spec_pwr:"):
-			data = np.fromstring(line[9:].decode('ascii').strip(), dtype=float, sep=" ") / 1000
-			print(len(data))
-			curve.setData(data)                     # set the curve with this data
-			QtGui.QApplication.processEvents()    # you MUST process the plot now
-	except UnicodeDecodeError:
+		if line.startswith(b"raw:"):
+			data = np.fromstring(line[4:].decode('ascii').strip(), dtype=int, sep=" ")
+			curve.setData(data)
+			p.setXRange(0,1024)
+			p.setYRange(0,4096)
+			QtGui.QApplication.processEvents()
+		if line.startswith(b"spec:"):
+			data = np.fromstring(line[5:].decode('ascii').strip(), dtype=float, sep=" ")
+			if len(data) == 256:
+				curve.setData(frequencyScale, data)
+				p.setXRange(0, 6500)
+				p.setYRange(0,500)
+				QtGui.QApplication.processEvents()
+		if line.startswith(b"mfcc:"):
+			data = np.fromstring(line[5:].decode('ascii').strip(), dtype=float, sep=" ")
+			p.setXRange(0,16)
+			p.setYRange(-20, 20)
+			curve.setData(data)
+			QtGui.QApplication.processEvents()
+		if line.startswith(b"stat:"):
+			print("stats: ", line[5:].decode('ascii').strip())
+		if line.startswith(b"msg:"):
+			print(line[4:].decode('ascii').strip())
 		pass
 	except KeyboardInterrupt as e:
 		raise e

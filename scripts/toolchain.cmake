@@ -57,7 +57,6 @@ SET(CCFLAGS "\
     -gdwarf \
     -W \
     -Wall \
-    -Wdouble-promotion \
     -Wduplicated-cond \
     -Werror=format \
     -Werror=maybe-uninitialized \
