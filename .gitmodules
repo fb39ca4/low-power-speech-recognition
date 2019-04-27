@@ -1,9 +1,6 @@
 [submodule "modm-repo"]
 	path = modm-repo
 	url = git@github.com:fb39ca4/modm.git
-[submodule "static_math"]
-	path = static_math
-	url = git@github.com:Morwenn/static_math.git
 [submodule "gcem"]
 	path = gcem
 	url = git@github.com:kthohr/gcem.git

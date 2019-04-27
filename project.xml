@@ -8,7 +8,7 @@
 		<option name=":build:project.name">speech_100</option>
 		<option name=":build:openocd.cfg">./scripts/openocd_board.cfg</option>
 		<option name=":build:cmake:include_makefile">False</option>
-		<option name=":docs:generate_module_docs">False</option>
+		<option name=":docs:generate_module_docs">True</option>
 	</options>
 	<modules>
 		<module>:cmsis:dsp</module>
