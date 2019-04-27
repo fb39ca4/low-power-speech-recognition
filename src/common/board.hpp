@@ -1,6 +1,7 @@
 #pragma once
 
 #include <modm/platform.hpp>
+#include <modm/debug/logger.hpp>
 
 #define MODM_BOARD_HAS_LOGGER
 
@@ -64,4 +65,4 @@ using SerialDebugRx = modm::platform::GpioInputA3;
 
 void initCommon();
 
-extern modm::IODeviceWrapper<SerialDebug, modm::IOBuffer::BlockIfFull> debugLogger;
+extern modm::log::Logger serOut;

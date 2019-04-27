@@ -8,18 +8,15 @@
 		<option name=":build:project.name">speech_100</option>
 		<option name=":build:openocd.cfg">./scripts/openocd_board.cfg</option>
 		<option name=":build:cmake:include_makefile">False</option>
-		<option name=":docs:generate_module_docs">True</option>
+		<option name=":docs:generate_module_docs">False</option>
 	</options>
 	<modules>
 		<module>:cmsis:dsp</module>
 		<module>:debug</module>
-		<module>:driver:adc_sampler</module>
-		<module>:math:filter</module>
 		<module>:platform:adc:1</module>
 		<module>:platform:core</module>
 		<module>:platform:clock</module>
 		<module>:platform:gpio</module>
-		<module>:platform:adc</module>
 		<module>:platform:uart:2</module>
 		<module>:platform:timer:5</module>
 		<module>:processing:protothread</module>

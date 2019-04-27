@@ -20,3 +20,9 @@ template <class T1, class T2> struct SameType {
 template <class T> struct SameType<T,T> {
     enum{ value = true };
 };
+
+//https://stackoverflow.com/a/19399478
+template<typename T>
+constexpr bool isPowerOf2(T v) {
+	return (v > 0) && ((v & (v - 1)) == 0);
+}

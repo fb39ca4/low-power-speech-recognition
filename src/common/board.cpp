@@ -2,14 +2,13 @@
 #include <modm/architecture/interface/clock.hpp>
 #include <modm/debug/logger.hpp>
 
+modm::IODeviceWrapper<SerialDebug, modm::IOBuffer::BlockIfFull> serialDevice;
+modm::log::Logger modm::log::debug(serialDevice);
+modm::log::Logger modm::log::info(serialDevice);
+modm::log::Logger modm::log::warning(serialDevice);
+modm::log::Logger modm::log::error(serialDevice);
 
-modm::IODeviceWrapper<SerialDebug, modm::IOBuffer::BlockIfFull> debugLogger;
-modm::log::Logger modm::log::debug(debugLogger);
-modm::log::Logger modm::log::info(debugLogger);
-modm::log::Logger modm::log::warning(debugLogger);
-modm::log::Logger modm::log::error(debugLogger);
-
-modm::IODevice& missionControlIO = debugLogger;
+modm::log::Logger serOut(serialDevice);
 
 using namespace modm::literals;
 

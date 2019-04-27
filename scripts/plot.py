@@ -41,27 +41,27 @@ def get_data():
 def update():
 	try:
 		line = ser.readline()
-		if line.startswith(b"raw:"):
+		if line.startswith(b"stat:"):
+		 	print("stat: ", line[5:].decode('ascii').strip())
+		elif line.startswith(b"raw:"):
 			data = np.fromstring(line[4:].decode('ascii').strip(), dtype=int, sep=" ")
 			curve.setData(data)
 			p.setXRange(0,1024)
 			p.setYRange(0,4096)
 			QtGui.QApplication.processEvents()
-		if line.startswith(b"spec:"):
+		elif line.startswith(b"spec:"):
 			data = np.fromstring(line[5:].decode('ascii').strip(), dtype=float, sep=" ")
 			if len(data) == 256:
 				curve.setData(frequencyScale, data)
 				p.setXRange(0, 6500)
 				p.setYRange(0,500)
 				QtGui.QApplication.processEvents()
-		if line.startswith(b"mfcc:"):
+		elif line.startswith(b"mfcc:"):
 			data = np.fromstring(line[5:].decode('ascii').strip(), dtype=float, sep=" ")
 			p.setXRange(0,16)
 			p.setYRange(-20, 20)
 			curve.setData(data)
 			QtGui.QApplication.processEvents()
-		if line.startswith(b"stat:"):
-			print("stats: ", line[5:].decode('ascii').strip())
 		if line.startswith(b"msg:"):
 			print(line[4:].decode('ascii').strip())
 		pass

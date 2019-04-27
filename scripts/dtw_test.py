@@ -1,13 +1,9 @@
-import scipy
-from scipy.io import wavfile
-import numpy as np
-import matplotlib.pyplot as plt
-import samplerate
-import python_speech_features
-from collections import deque
-from dtw import dtw, accelerated_dtw
 import itertools
 import serial
+import numpy as np
+import matplotlib.pyplot as plt
+from dtw import dtw, accelerated_dtw
+
 
 ser = serial.Serial("/dev/ttyACM0", 1000000)
 
@@ -22,7 +18,7 @@ def get_words(file):
 			if line.startswith(b"mfcc:"):
 				data = np.fromstring(line[5:].decode('ascii').strip(), dtype=float, sep=" ")
 				amplitude = data[0]
-				mfcc = data[2:7]
+				mfcc = data[2:9]
 				mfcc_norm = np.linalg.norm(mfcc)
 				mfcc = mfcc * np.log(mfcc_norm + 1) / mfcc_norm
 				if amplitude > 0.01:
@@ -37,8 +33,8 @@ def get_words(file):
 		except KeyboardInterrupt as e:
 			raise e
 
-recorded_data = open("2019-04-26_18-44-36.txt", "rb")
-text = open("words.txt")
+recorded_data = open("data/voice.txt", "rb")
+text = open("data/words.txt")
 word_dictionary = dict(zip(map(lambda s: s.strip(), text), get_words(recorded_data)))
 text.close()
 recorded_data.close()

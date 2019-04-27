@@ -37,6 +37,6 @@ for mfcc in get_mfcc():
 	amplitude = mfcc[0]
 	amplitudes.append(amplitude)
 
-plt.plot(np.array(amplitudes) * 50)
+plt.plot(np.array(amplitudes))
 plt.show()
 
