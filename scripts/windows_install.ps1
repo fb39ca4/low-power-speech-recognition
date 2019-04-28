@@ -49,8 +49,6 @@ Install-Necessary gcc7-arm-none-eabi "arm-none-eabi-gcc -dumpversion" fb39ca4 "h
 Install-Necessary make "make --version"
 Install-Necessary cmake "cmake --version"
 Install-Necessary openocd "openocd --version" fb39ca4 "https://github.com/fb39ca4/scoop-fb39ca4.git"
-Install-Necessary doxygen "doxygen --version"
-Install-Necessary graphviz "gvgen -?"
 
 Write-Output "Already installed: $alreadyInstalled"
 Write-Output "Newly Installed: $toInstall"
