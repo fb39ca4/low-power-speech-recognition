@@ -171,7 +171,7 @@ int main(void) {
 	int frames = 0;
 
 	int wordLength = 0;
-	constexpr int maxQuietGap = 5;
+	constexpr int maxQuietGap = 7;
 	int quietGapCounter = 0;
 	float amplitudeThreshold = 0.01;
 
@@ -300,7 +300,7 @@ int main(void) {
 				wordBuffer[wordLength - 1] = featureVector;
 			}
 
-			if (wordFinished) {
+			if (wordFinished && wordLength > 4) {
 				serOut << "msg: " << wordLength << modm::endl;
 				serOut << "msg:word length: " << wordLength << modm::endl;
 
@@ -309,7 +309,7 @@ int main(void) {
 					dtwResults[i] = dtwWorkspace.compare(
 						voiceCommands[i].featureVectors, voiceCommands[i].numFeatureVectors,
 						wordBuffer.data(), wordLength
-					) / voiceCommands[i].numFeatureVectors;
+					);
 				}
 				dtwTime = timekeeping::now();
 
@@ -322,12 +322,12 @@ int main(void) {
 					}
 				}
 
-				if (bestMatchIdx >= 0) {
-					serOut << "msg:word: " << voiceCommands[bestMatchIdx].text << modm::endl;
+				for (int i = 0; i < numVoiceCommands; i++) {
+					serOut << "msg:score: " << voiceCommands[i].text << ", "<< dtwResults[i] << modm::endl;
 				}
 
-				for (int i = 0; i < numVoiceCommands; i++) {
-					serOut << "msg:dtw: " << voiceCommands[i].text << ", "<< dtwResults[i] << modm::endl;
+				if (bestMatchIdx >= 0) {
+					serOut << "msg:best match: " << voiceCommands[bestMatchIdx].text << modm::endl;
 				}
 
 				wordLength = 0;

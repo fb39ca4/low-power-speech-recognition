@@ -5,9 +5,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 from dtw import dtw, accelerated_dtw
 
-
-ser = serial.Serial("/dev/ttyACM0", 1000000)
-
 featureVectorMinEntry = 2
 featureVectorMaxEntry = 9
 featureVectorDim = featureVectorMaxEntry - featureVectorMinEntry
@@ -16,7 +13,7 @@ def get_words(file):
 	current_word = []
 	amplitude_threshold = 0.01
 	quiet_counter = 0
-	max_quiet_period = 5
+	max_quiet_period = 7
 
 	for line in file:
 		try:
@@ -38,7 +35,7 @@ def get_words(file):
 		except KeyboardInterrupt as e:
 			raise e
 
-recorded_data = open("data/voice.txt", "rb")
+recorded_data = open("data/amalie_da.txt", "rb")
 text = open("data/words.txt")
 word_dictionary = dict(zip(map(lambda s: s.strip(), text), get_words(recorded_data)))
 text.close()

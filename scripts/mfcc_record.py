@@ -14,7 +14,7 @@ import time
 ser = serial.Serial("/dev/ttyACM0", 1000000)
 
 def get_mfcc():
-	f = open(time.strftime("%Y-%m-%d_%H-%M-%S.txt", time.gmtime()), "w")
+	f = open(time.strftime(f"data/{sys.argv[1]}.txt", time.gmtime()), "w")
 
 	for _ in range(10): ser.readline()
 

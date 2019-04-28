@@ -33,7 +33,7 @@ def get_words(file):
 		except KeyboardInterrupt as e:
 			raise e
 
-recorded_data = open("data/voice.txt", "rb")
+recorded_data = open("data/amalie.txt", "rb")
 text = open("data/words.txt")
 word_dictionary = dict(zip(map(lambda s: s.strip(), text), get_words(recorded_data)))
 text.close()

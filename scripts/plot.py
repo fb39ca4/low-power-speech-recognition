@@ -42,7 +42,8 @@ def update():
 	try:
 		line = ser.readline()
 		if line.startswith(b"stat:"):
-		 	print("stat: ", line[5:].decode('ascii').strip())
+			#print("stat: ", line[5:].decode('ascii').strip())
+			pass
 		elif line.startswith(b"raw:"):
 			data = np.fromstring(line[4:].decode('ascii').strip(), dtype=int, sep=" ")
 			curve.setData(data)
